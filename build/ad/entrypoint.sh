@@ -52,6 +52,12 @@ provision() {
     else
         sed -i "/\[global\]/a\\\tdns forwarder = ${DNS_FORWARDER}" "${SMB_CONF}"
     fi
+
+    # Разрешаем подключение по simple bind по 389
+    if ! grep -q 'ldap server require strong auth' "${SMB_CONF}"; then
+        sed -i "/\[global\]/a\\\tldap server require strong auth = no" "${SMB_CONF}"
+    fi
+
     log "provision завершён"
 }
 

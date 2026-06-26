@@ -30,6 +30,10 @@ services:
       retries: 5
       start_period: 60s
     restart: unless-stopped
+    networks:
+      default:
+        # Фиксированный IP DC — чтобы клиенты ссылались на стабильный адрес, а не на меняющийся при пересоздании.
+        ipv4_address: 172.18.0.13
 
 networks:
   default:

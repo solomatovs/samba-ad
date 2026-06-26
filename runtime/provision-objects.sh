@@ -41,8 +41,9 @@ fi
 # shellcheck source=/dev/null
 . "${OBJECTS_CONF}"
 
-user_exists()  { samba-tool user list  2>/dev/null | grep -qx "$1"; }
-group_exists() { samba-tool group list 2>/dev/null | grep -qx "$1"; }
+user_exists()     { samba-tool user list     2>/dev/null | grep -qx "$1"; }
+group_exists()    { samba-tool group list    2>/dev/null | grep -qx "$1"; }
+computer_exists() { samba-tool computer list 2>/dev/null | grep -Fqx "$1\$"; }
 
 export_keytab() {
     local keytab="$1"; shift
@@ -118,6 +119,21 @@ for spec in "${AD_SERVICES[@]:-}"; do
     esac
 
     [ -n "${keytab}" ] && export_keytab "${keytab}" "${spn_list[@]}"
+done
+
+# --- computer-аккаунты: имя:пароль ---
+# Для NTLM-движков (Jespa/EasySSO) сервисная учётка обязана быть computer-аккаунтом
+# (sAMAccountName оканчивается на '$'). Пароль выставляется на каждом прогоне —
+# идемпотентно гарантирует, что он совпадает с объявленным.
+for spec in "${AD_COMPUTERS[@]:-}"; do
+    [ -n "${spec}" ] || continue
+    IFS=: read -r name pass <<<"${spec}"
+    [ -n "${name}" ] || continue
+    computer_exists "${name}" || { log "computer create ${name}"; samba-tool computer create "${name}"; }
+    log "computer setpassword ${name}\$"
+    samba-tool user setpassword "${name}\$" --newpassword="${pass}" >/dev/null 2>&1 \
+        || log "WARN: не удалось выставить пароль ${name}\$"
+    samba-tool user setexpiry "${name}\$" --noexpiry >/dev/null 2>&1 || true
 done
 
 log "готово"
